@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>SnackU — База</title>
+<style>
+  body { background:#0f172a; color:#f1f5f9; font-family:'Segoe UI',sans-serif;
+         display:flex; justify-content:center; align-items:center;
+         min-height:100vh; margin:0; }
+  .card { background:#1e293b; padding:30px; border-radius:16px;
+          width:380px; box-shadow:0 10px 40px rgba(0,0,0,.5); }
+  h1 { margin:0 0 20px; font-size:22px; }
+  input { width:100%; padding:12px; border-radius:10px;
+          background:#334155; color:#f1f5f9; border:1px solid #475569;
+          font-size:14px; box-sizing:border-box; margin-bottom:10px; }
+  button { width:100%; padding:12px; border-radius:24px; border:0;
+           background:#3b82f6; color:#fff; font-size:15px;
+           font-weight:bold; cursor:pointer; margin-bottom:10px; }
+  button:disabled { background:#475569; cursor:not-allowed; }
+  .err { color:#ef4444; font-size:12px; margin-top:6px; }
+  .ok  { color:#22c55e; font-size:13px; margin-top:6px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>SnackU — База</h1>
+
+  <input id="phone"   placeholder="+79991234567">
+  <input id="name"    placeholder="Имя">
+  <input id="surname" placeholder="Фамилия">
+
+  <button id="btnReg" onclick="doRegister()">Зарегистрировать</button>
+  <button id="btnFind" onclick="doLookup()">Найти по номеру</button>
+
+  <div id="status" class="err"></div>
+</div>
+
+<script>
+const statusEl = document.getElementById('status');
+
+function setStatus(text, cls) {
+  statusEl.textContent = text;
+  statusEl.className = cls;
+}
+
+async function api(payload) {
+  const res = await fetch('/api', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  return {status: res.status, data};
+}
+
+async function doRegister() {
+  const phone   = document.getElementById('phone').value.trim();
+  const name    = document.getElementById('name').value.trim();
+  const surname = document.getElementById('surname').value.trim();
+
+  if (!phone || !name || !surname) {
+    setStatus('Заполни все поля', 'err');
+    return;
+  }
+
+  document.getElementById('btnReg').disabled = true;
+  setStatus('Отправка...', 'ok');
+
+  try {
+    const r = await api({action: 'register', phone, name, surname});
+
+    if (r.status === 200 && r.data.status === 'ok') {
+      setStatus(`✅ Готово! ${phone} в базе`, 'ok');
+    } else if (r.status === 409) {
+      setStatus('⚠ Этот номер уже зарегистрирован', 'err');
+    } else if (r.status === 400) {
+      setStatus('⚠ ' + (r.data.message || 'Неверные данные'), 'err');
+    } else {
+      setStatus(r.data.message || 'Ошибка', 'err');
+    }
+  } catch (e) {
+    setStatus('Сервер Перегружен Попробуйте ещё Раз', 'err');
+  } finally {
+    document.getElementById('btnReg').disabled = false;
+  }
+}
+
+async function doLookup() {
+  const phone = document.getElementById('phone').value.trim();
+  if (!phone) {
+    setStatus('Введи номер', 'err');
+    return;
+  }
+
+  document.getElementById('btnFind').disabled = true;
+  setStatus('Поиск...', 'ok');
+
+  try {
+    const r = await api({action: 'lookup', phone});
+
+    if (r.status === 200 && r.data.found) {
+      const u = r.data.user;
+      setStatus(`✅ Найден: ${u.name} ${u.surname}`, 'ok');
+    } else if (r.status === 200 && !r.data.found) {
+      setStatus('Введи Номер Который Ввел в SnackU!', 'err');
+    } else {
+      setStatus(r.data.message || 'Ошибка', 'err');
+    }
+  } catch (e) {
+    setStatus('Сервер Перегружен Попробуйте ещё раз', 'err');
+  } finally {
+    document.getElementById('btnFind').disabled = false;
+  }
+}
+</script>
+</body>
+</html>
